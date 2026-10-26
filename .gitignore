@@ -1,0 +1,7 @@
+native-dll/build/
+Discorder-Proxy-Addon/
+Discorder-Proxy-Addon-v*.zip
+Discorder-Proxy-Addon.zip
+__pycache__/
+*.py[cod]
+*.log
