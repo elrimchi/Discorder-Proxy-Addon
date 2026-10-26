@@ -53,11 +53,11 @@ Logging is off by default (`log=0`). Set `log=1` to write a shared log at `%LOCA
 
 ## Manual build
 
-You need Visual Studio Build Tools with **Desktop development with C++** and Python 3. Run `release.cmd` from the project root to build the DLL and create a ZIP with the version in its name, such as `Discorder-Proxy-Addon-v1.1.1.zip`. Attach this ZIP to your GitHub release. The `Discorder-Proxy-Addon` folder contains the extracted installer and DLL.
+You need Visual Studio Build Tools with **Desktop development with C++** and Python 3. Run `release.cmd` from the project root to build the DLL and create a ZIP with the version in its name, such as `Discorder-Proxy-Addon-v1.1.2.zip`. Attach this ZIP to your GitHub release. The `Discorder-Proxy-Addon` folder contains the extracted installer and DLL.
 
 To build and package separately, run `native-dll/build.cmd`, then `python native-dll/package.py`.
 
-Before releasing a new version, update `[addon] version` in `native-dll/discord-proxy.ini` and the version fields in `native-dll/src/version.rc`, then rebuild the DLL. The tag must match the package version, for example `v1.1.1`.
+Before releasing a new version, update `[addon] version` in `native-dll/discord-proxy.ini` and the version fields in `native-dll/src/version.rc`, then rebuild the DLL. The tag must match the package version, for example `v1.1.2`.
 
 GitHub Actions builds the Windows version. When you publish a `v*` tag, the workflow attaches a ZIP to a pre-release.
 

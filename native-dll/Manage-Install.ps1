@@ -23,7 +23,9 @@ $script:Messages = @{
         YesNo = 'Enter y (yes) or n (no). Press Enter to cancel.'
         Cancelled = 'Cancelled. Discord is still running.'
         Closed = 'Discord processes have been closed.'
-        CloseFailed = 'Could not close Discord. Close it from the system tray and try again.'
+        Closing = 'Closing Discord...'
+        CloseFailed = 'Discord is still running after several attempts: {0}. Close it from the system tray and retry.'
+        CloseDenied = 'Windows denied permission to close Discord: {0}. Close it manually, or run the installer with the same permissions as Discord.'
         ExistingInstall = 'An installation already exists in {0}. Uninstall it before replacing it.'
         Installed = 'TCP/UDP module installed: {0}'
         ManifestFormat = 'Unknown installation manifest format.'
@@ -60,7 +62,9 @@ $script:Messages = @{
         YesNo = 'Введите д (да) или н (нет). Для отмены нажмите Enter.'
         Cancelled = 'Действие отменено. Discord продолжает работать.'
         Closed = 'Процессы Discord завершены.'
-        CloseFailed = 'Не удалось завершить Discord. Закройте его через значок в системном трее и повторите попытку.'
+        Closing = 'Завершение процессов Discord...'
+        CloseFailed = 'После нескольких попыток Discord продолжает работать: {0}. Закройте его через значок в системном трее и повторите попытку.'
+        CloseDenied = 'Windows не разрешила завершить Discord: {0}. Закройте его вручную или запустите установщик с теми же правами, что и Discord.'
         ExistingInstall = 'В папке {0} уже есть установленный модуль. Удалите его перед повторной установкой.'
         Installed = 'Модуль TCP/UDP установлен: {0}'
         ManifestFormat = 'Неизвестный формат файла сведений об установке.'
@@ -106,7 +110,7 @@ function Get-DiscordProcesses {
     Get-Process -Name $script:DiscordProcessNames -ErrorAction SilentlyContinue
 }
 
-function Confirm-DiscordClosed {
+function Confirm-DiscordClosed([ValidateRange(500,30000)][int]$TimeoutMilliseconds = 10000) {
     $processes = @(Get-DiscordProcesses)
     if (-not $processes.Count) { return $true }
     do {
@@ -119,16 +123,52 @@ function Confirm-DiscordClosed {
         Write-Host (Get-Text YesNo)
     } while ($true)
 
-    foreach ($process in $processes) {
-        # Preserve paths detected from running portable installations before closing them.
-        if ($process.Path) { $script:DiscordPath += $process.Path }
-        try { Stop-Process -InputObject $process -Force -ErrorAction Stop }
-        catch {
-            if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) { throw (Get-Text CloseFailed) }
+    Write-Host (Get-Text Closing)
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    $denied = @{}
+    $quietChecks = 0
+    while ($timer.ElapsedMilliseconds -lt $TimeoutMilliseconds) {
+        if ($processes.Count) {
+            $quietChecks = 0
+            foreach ($process in $processes) {
+                try {
+                    if ($process.Path -and $script:DiscordPath -notcontains $process.Path) { $script:DiscordPath += $process.Path }
+                } catch {}
+                try { Stop-Process -InputObject $process -Force -ErrorAction Stop }
+                catch {
+                    $exception = $_.Exception
+                    $accessDenied = $_.CategoryInfo.Category -eq 'PermissionDenied'
+                    while ($exception) {
+                        if ($exception -is [UnauthorizedAccessException] -or
+                            ($exception -is [ComponentModel.Win32Exception] -and $exception.NativeErrorCode -eq 5)) {
+                            $accessDenied = $true
+                        }
+                        $exception = $exception.InnerException
+                    }
+                    if ($accessDenied) { $denied[$process.Id] = $true }
+                }
+            }
+        } else {
+            $quietChecks++
+            if ($quietChecks -ge 5) {
+                $processes = @(Get-DiscordProcesses)
+                if (-not $processes.Count) {
+                    Write-Host (Get-Text Closed)
+                    return $true
+                }
+                $quietChecks = 0
+                continue
+            }
         }
+        Start-Sleep -Milliseconds 100
+        $processes = @(Get-DiscordProcesses)
     }
-    Wait-Process -Id @($processes | ForEach-Object { $_.Id }) -Timeout 5 -ErrorAction SilentlyContinue
-    if (@(Get-DiscordProcesses).Count) { throw (Get-Text CloseFailed) }
+    $remaining = @(Get-DiscordProcesses)
+    if ($remaining.Count) {
+        $details = ($remaining | ForEach-Object { '{0} (PID {1})' -f $_.ProcessName, $_.Id }) -join ', '
+        if (@($remaining | Where-Object { $denied.ContainsKey($_.Id) }).Count) { throw (Get-Text CloseDenied @($details)) }
+        throw (Get-Text CloseFailed @($details))
+    }
     Write-Host (Get-Text Closed)
     return $true
 }
@@ -485,5 +525,5 @@ if ($MyInvocation.InvocationName -ne '.') {
     try {
         if (-not (Confirm-DiscordClosed)) { exit 0 }
         if ($Mode -eq 'Menu') { Show-ProxyMenu } else { Invoke-ProxyInstall $Mode }
-    } catch { Write-Error $_; exit 1 }
+    } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }
 }

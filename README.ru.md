@@ -53,11 +53,11 @@ password=
 
 ## Ручная сборка
 
-Для сборки нужны Visual Studio Build Tools с компонентом **Desktop development with C++** и Python 3. Запустите `release.cmd` из корня проекта: он соберёт DLL и создаст готовый ZIP с номером версии, например `Discorder-Proxy-Addon-v1.1.1.zip`. Этот ZIP нужно прикреплять к релизу GitHub. В папке `Discorder-Proxy-Addon` будет распакованный пакет с установщиком и DLL.
+Для сборки нужны Visual Studio Build Tools с компонентом **Desktop development with C++** и Python 3. Запустите `release.cmd` из корня проекта: он соберёт DLL и создаст готовый ZIP с номером версии, например `Discorder-Proxy-Addon-v1.1.2.zip`. Этот ZIP нужно прикреплять к релизу GitHub. В папке `Discorder-Proxy-Addon` будет распакованный пакет с установщиком и DLL.
 
 Отдельно собрать DLL и упаковать её можно командами `native-dll/build.cmd`, затем `python native-dll/package.py`.
 
-Перед выпуском новой версии измените номер в `[addon] version` файла `native-dll/discord-proxy.ini` и поля версии в `native-dll/src/version.rc`, затем пересоберите DLL. Номер тега должен совпадать с версией пакета, например `v1.1.1`.
+Перед выпуском новой версии измените номер в `[addon] version` файла `native-dll/discord-proxy.ini` и поля версии в `native-dll/src/version.rc`, затем пересоберите DLL. Номер тега должен совпадать с версией пакета, например `v1.1.2`.
 
 В GitHub Actions настроена сборка для Windows. При публикации тега вида `v*` workflow прикладывает ZIP к предварительному релизу.
 
