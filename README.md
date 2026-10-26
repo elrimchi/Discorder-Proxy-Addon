@@ -27,18 +27,11 @@ The menu also lets you remove the add-on, select the Discord folder, edit the co
 
 Download the new release, extract it into a separate folder, and run `Discord-Proxy.bat`. Choose Install / update. Your proxy address, port, and other settings are preserved. Any new options missing from your INI are added with their default values.
 
-The installed module version is stored in the `[addon]` section of `discord-proxy.ini`:
-
-```ini
-[addon]
-version=1.1.0
-```
-
-The installer updates this field automatically and supports older installations without version metadata. Downgrades are blocked. If an update fails, the installer restores the previous DLL and INI.
+Downgrades are blocked. If an update fails, the installer restores the previous DLL and INI.
 
 ## Settings and logs
 
-Use `discord-proxy.ini` to change the proxy address (`host`, `port`), enable or disable TCP and UDP, and configure proxying for Chromium and native HTTP requests.
+Use `discord-proxy.ini` to change the proxy address (`host`, `port`), enable or disable TCP and UDP, and configure proxying for Chromium.
 
 The installer also stores a list of Discord installation folders in `%LOCALAPPDATA%\DiscordProcessProxy\installations.json`. That file contains no proxy settings.
 
@@ -54,17 +47,17 @@ password=
 
 Both fields are empty by default, so the connection uses no authentication. To enable authentication, fill in both fields and restart Discord. Each value must be 1 to 255 UTF-8 bytes long. These settings are preserved during updates.
 
-With credentials configured, the DLL handles authentication for TCP and UDP. The `chromium_proxy` and `native_http_proxy` options are not applied in this mode, and hostnames are resolved through system DNS.
+With credentials configured, the DLL handles authentication for TCP and UDP. The `chromium_proxy` option is not applied in this mode, and hostnames are resolved through system DNS.
 
 Logging is off by default (`log=0`). Set `log=1` to write a shared log at `%LOCALAPPDATA%\DiscordProcessProxy\discord-proxy.log`. The file is capped at 2 MiB and does not contain message contents.
 
 ## Manual build
 
-You need Visual Studio Build Tools with **Desktop development with C++** and Python 3. Run `release.cmd` from the project root to build the DLL and create a ZIP with the version in its name, such as `Discorder-Proxy-Addon-v1.1.0.zip`. Attach this ZIP to your GitHub release. The `Discorder-Proxy-Addon` folder contains the extracted installer and DLL.
+You need Visual Studio Build Tools with **Desktop development with C++** and Python 3. Run `release.cmd` from the project root to build the DLL and create a ZIP with the version in its name, such as `Discorder-Proxy-Addon-v1.1.1.zip`. Attach this ZIP to your GitHub release. The `Discorder-Proxy-Addon` folder contains the extracted installer and DLL.
 
 To build and package separately, run `native-dll/build.cmd`, then `python native-dll/package.py`.
 
-Before releasing a new version, update `[addon] version` in `native-dll/discord-proxy.ini` and the version fields in `native-dll/src/version.rc`, then rebuild the DLL. The tag must match the package version, for example `v1.1.0`.
+Before releasing a new version, update `[addon] version` in `native-dll/discord-proxy.ini` and the version fields in `native-dll/src/version.rc`, then rebuild the DLL. The tag must match the package version, for example `v1.1.1`.
 
 GitHub Actions builds the Windows version. When you publish a `v*` tag, the workflow attaches a ZIP to a pre-release.
 

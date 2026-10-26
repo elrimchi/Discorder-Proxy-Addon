@@ -34,6 +34,7 @@ $script:Messages = @{
         DllChanged = 'version.dll changed in {0}. Removal stopped to protect your files.'
         BackupName = 'Invalid backup file name.'
         BackupMissing = 'The original DLL backup is missing or changed. Restore the backup before uninstalling.'
+        RollbackFailed = 'Update failed. Could not restore these files: {0}. Keep the backups and check write permissions before retrying.'
         Removed = 'Module removed; the previous DLL was restored if present: {0}'
         UpdateStopped = 'The installed DLL is missing or changed in {0}. Automatic update stopped.'
         AlreadyCurrent = 'The module is already up to date: {0}'
@@ -70,6 +71,7 @@ $script:Messages = @{
         DllChanged = 'Файл version.dll в папке {0} изменён. Удаление остановлено, чтобы сохранить ваши файлы.'
         BackupName = 'Недопустимое имя резервной копии.'
         BackupMissing = 'Резервная копия исходной DLL отсутствует или изменена. Восстановите её перед удалением модуля.'
+        RollbackFailed = 'Обновление не выполнено. Не удалось восстановить файлы: {0}. Сохраните резервные копии и проверьте права на запись перед повторной попыткой.'
         Removed = 'Модуль удалён; предыдущая DLL восстановлена, если она была сохранена: {0}'
         UpdateStopped = 'Установленная DLL в папке {0} отсутствует или изменена. Автоматическое обновление остановлено.'
         AlreadyCurrent = 'Уже установлена актуальная версия: {0}'
@@ -272,9 +274,9 @@ function Set-AddonTarget([string]$Directory, [string]$SourceDll, [string]$Source
                     $Record.BackupHash = Get-ProxyHash $dll
                 }
                 [IO.File]::Replace($stage, $dll, $backup)
+                $dllWritten = $true
                 if ($updating) { $Record | Add-Member -NotePropertyName PreviousBuildName -NotePropertyValue $backupName -Force }
-            } else { [IO.File]::Move($stage, $dll) }
-            $dllWritten = $true
+            } else { [IO.File]::Move($stage, $dll); $dllWritten = $true }
         }
         if (-not $configExisted -or $merged -cne $text) {
             # UTF-16 lets the Windows INI API read non-ASCII settings and comments.
@@ -288,18 +290,25 @@ function Set-AddonTarget([string]$Directory, [string]$SourceDll, [string]$Source
         $Record | Add-Member -NotePropertyName Version -NotePropertyValue $version -Force
         Save-InstallRecord $manifest $Record
     } catch {
+        $failure = $_
+        $restoreErrors = @()
         if ($configWritten) {
-            if ($configExisted) { Write-AtomicBytes $ini $configBytes }
-            else { Remove-Item -LiteralPath $ini }
+            try {
+                if ($configExisted) { Write-AtomicBytes $ini $configBytes }
+                else { Remove-Item -LiteralPath $ini }
+            } catch { $restoreErrors += $ini }
         }
         if ($dllWritten) {
-            if ($backup) {
-                [IO.File]::Replace($backup, $dll, ($stage + '.rollback'))
-                Remove-Item -LiteralPath ($stage + '.rollback') -Force -ErrorAction SilentlyContinue
-            }
-            else { Remove-Item -LiteralPath $dll }
+            try {
+                if ($backup) {
+                    [IO.File]::Replace($backup, $dll, ($stage + '.rollback'))
+                    Remove-Item -LiteralPath ($stage + '.rollback') -Force -ErrorAction SilentlyContinue
+                }
+                else { Remove-Item -LiteralPath $dll }
+            } catch { $restoreErrors += $dll }
         }
-        throw
+        if ($restoreErrors.Count) { throw (Get-Text RollbackFailed @($restoreErrors -join ', ')) }
+        throw $failure
     } finally {
         if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Force -ErrorAction SilentlyContinue }
     }

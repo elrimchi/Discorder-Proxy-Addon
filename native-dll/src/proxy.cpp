@@ -592,6 +592,8 @@ void complete(const std::shared_ptr<Receive>& op, bool immediate) {
     }
     HANDLE port = nullptr; ULONG_PTR key = 0; UCHAR modes = 0;
     { std::lock_guard<std::mutex> guard(op->owner->lock); port = op->owner->port; key = op->owner->key; modes = op->owner->notificationModes; }
+    // The caller may reuse OVERLAPPED as soon as completion becomes visible.
+    const auto event = reinterpret_cast<ULONG_PTR>(op->user->hEvent);
     op->user->InternalHigh = op->bytes;
     InterlockedExchangePointer(reinterpret_cast<PVOID volatile*>(&op->user->Internal), reinterpret_cast<PVOID>(nativeStatus(op->error)));
     op->done.store(true, std::memory_order_release);
@@ -601,7 +603,6 @@ void complete(const std::shared_ptr<Receive>& op, bool immediate) {
         if (!QueueUserAPC(userApc, op->thread, reinterpret_cast<ULONG_PTR>(holder))) { delete holder; log("Receive APC delivery failed", GetLastError()); }
         return;
     }
-    const auto event = reinterpret_cast<ULONG_PTR>(op->user->hEvent);
     if (event & ~ULONG_PTR(1)) SetEvent(reinterpret_cast<HANDLE>(event & ~ULONG_PTR(1)));
     if (port && !(event & 1) && !(immediate && (modes & FILE_SKIP_COMPLETION_PORT_ON_SUCCESS)))
         PostQueuedCompletionStatus(port, op->bytes, key, op->user);
@@ -834,11 +835,6 @@ bool initialize(HMODULE module) {
     s.commandLineAnsi.resize(ansiSize);
     WideCharToMultiByte(CP_ACP, 0, s.commandLine.c_str(), -1, &s.commandLineAnsi[0], ansiSize, nullptr, nullptr);
     s.commandLineAnsi.resize(ansiSize - 1);
-    // Explicit Chromium/HTTP proxy settings bypass our authenticated SOCKS handshake.
-    if (!authenticated && GetPrivateProfileIntW(L"proxy", L"native_http_proxy", 1, ini.c_str())) {
-        std::wstring value = L"http://" + std::wstring(host) + L":" + std::to_wstring(port);
-        SetEnvironmentVariableW(L"http_proxy", value.c_str()); SetEnvironmentVariableW(L"https_proxy", value.c_str());
-    }
     if (MH_Initialize() != MH_OK) return false;
     struct Hook { const wchar_t* dll; const char* name; void* replacement; void** original; };
 #define HOOK(dll, name) {dll, #name, reinterpret_cast<void*>(hook_##name), reinterpret_cast<void**>(&real_##name)}
